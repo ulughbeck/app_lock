@@ -1,0 +1,6 @@
+include: package:effective_dart/analysis_options.yaml
+
+linter:
+  rules:
+    # Disabled
+    public_member_api_docs: false

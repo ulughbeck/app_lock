@@ -99,11 +99,13 @@ class _AppLockerState extends LifeCycleObserverState<AppLocker> {
   late StreamSubscription<AppLockerState> _sub;
   late bool _isAppLocked;
   late bool _isAppLockerInitialised;
+  late bool _isAppLockerScreenActive;
 
   @override
   void initState() {
     super.initState();
     _isAppLockerInitialised = false;
+    _isAppLockerScreenActive = false;
     _isAppLocked = false;
 
     _bloc = AppLockerBloc(
@@ -146,8 +148,14 @@ class _AppLockerState extends LifeCycleObserverState<AppLocker> {
 
   @override
   Future<bool> didPopRoute() async {
-    _navKey.currentState?.maybePop();
-    return true;
+    print(_isAppLockerScreenActive);
+
+    if (_isAppLockerScreenActive) {
+      _navKey.currentState?.maybePop();
+      return true;
+    } else {
+      return false;
+    }
   }
 
   @override
@@ -168,6 +176,7 @@ class _AppLockerState extends LifeCycleObserverState<AppLocker> {
   /// unlock App
   void unlockApp() {
     _isAppLocked = false;
+    _isAppLockerScreenActive = false;
     _navKey.currentState?.popUntil(
       (route) => route.settings.name != lockScreenRoute,
     );
@@ -228,40 +237,59 @@ class _AppLockerState extends LifeCycleObserverState<AppLocker> {
   }
 
   /// start setup of App Locker process
-  void setup() => _navKey.currentState?.push(
-        LockScreenRoutes.setNewPin(
-          pinLength: _config.pinLength,
-          setPinTitle: widget.setPinTitle,
-          repeatPinTitle: widget.repeatPinTitle,
-          dontMatchErrorMessage: widget.dontMatchErrorMessage,
-          decoration: widget.decoration,
-          top: widget.top,
-          bottom: widget.bottom,
-          savePin: (value) async => _bloc.add(AppLockerEvent.savePin(value)),
-          onPinSetFinish: () {
-            _bloc.add(const AppLockerEvent.enableBiometrics());
-            _setupBiometrics();
-          },
-        ),
-      );
+  void setup() {
+    _isAppLockerScreenActive = true;
+    _navKey.currentState?.push(
+      LockScreenRoutes.setNewPin(
+        pinLength: _config.pinLength,
+        setPinTitle: widget.setPinTitle,
+        repeatPinTitle: widget.repeatPinTitle,
+        dontMatchErrorMessage: widget.dontMatchErrorMessage,
+        decoration: widget.decoration,
+        top: widget.top,
+        bottom: widget.bottom,
+        savePin: (value) async => _bloc.add(AppLockerEvent.savePin(value)),
+        onPinSetFinish: () {
+          _isAppLockerScreenActive = false;
+          _bloc.add(const AppLockerEvent.enableBiometrics());
+          _setupBiometrics();
+        },
+        onWillPop: () async {
+          _isAppLockerScreenActive = false;
+          return true;
+        },
+      ),
+    );
+  }
 
   /// start set new PIN process
-  Future<void>? setNewPin() => _navKey.currentState?.push<void>(
-        LockScreenRoutes.setNewPin(
-          pinLength: _config.pinLength,
-          setPinTitle: widget.setPinTitle,
-          repeatPinTitle: widget.repeatPinTitle,
-          dontMatchErrorMessage: widget.dontMatchErrorMessage,
-          decoration: widget.decoration,
-          top: widget.top,
-          bottom: widget.bottom,
-          savePin: (value) async => _bloc.add(AppLockerEvent.savePin(value)),
-          onPinSetFinish: () => _bloc.add(const AppLockerEvent.enablePin()),
-        ),
-      );
+  Future<void>? setNewPin() {
+    _isAppLockerScreenActive = true;
+    _navKey.currentState?.push<void>(
+      LockScreenRoutes.setNewPin(
+        pinLength: _config.pinLength,
+        setPinTitle: widget.setPinTitle,
+        repeatPinTitle: widget.repeatPinTitle,
+        dontMatchErrorMessage: widget.dontMatchErrorMessage,
+        decoration: widget.decoration,
+        top: widget.top,
+        bottom: widget.bottom,
+        savePin: (value) async => _bloc.add(AppLockerEvent.savePin(value)),
+        onPinSetFinish: () {
+          _isAppLockerScreenActive = false;
+          _bloc.add(const AppLockerEvent.enablePin());
+        },
+        onWillPop: () async {
+          _isAppLockerScreenActive = false;
+          return true;
+        },
+      ),
+    );
+  }
 
   /// start change current PIN process
   Future<void>? changePinCode() {
+    _isAppLockerScreenActive = true;
     if (isPinConfigured) {
       return _navKey.currentState?.push(
         LockScreenRoutes.changePin(
@@ -276,28 +304,37 @@ class _AppLockerState extends LifeCycleObserverState<AppLocker> {
           top: widget.top,
           bottom: widget.bottom,
           saveNewPin: (value) async => _bloc.add(AppLockerEvent.savePin(value)),
-          onPinSetFinish: () {},
+          onPinSetFinish: () {
+            _isAppLockerScreenActive = false;
+          },
+          onWillPop: () async {
+            _isAppLockerScreenActive = false;
+            return true;
+          },
         ),
       );
     }
     return setNewPin();
   }
 
-  void _pushLockScreen() => _navKey.currentState?.push(
-        LockScreenRoutes.enterPin(
-          correctPin: _correctPin,
-          onUnlock: unlockApp,
-          onWillPop: _onLockScreenPop,
-          askBiometricsAtStart: _config.askBiometricsAtStart,
-          enableBiometrics: _config.isBiometricsEnabled,
-          title: widget.title,
-          errorMessage: widget.errorMessage,
-          biometricsTitle: widget.biometricsTitle,
-          decoration: widget.decoration,
-          top: widget.top,
-          bottom: widget.bottom,
-        ),
-      );
+  void _pushLockScreen() {
+    _isAppLockerScreenActive = true;
+    _navKey.currentState?.push(
+      LockScreenRoutes.enterPin(
+        correctPin: _correctPin,
+        onUnlock: unlockApp,
+        onWillPop: _onLockScreenPop,
+        askBiometricsAtStart: _config.askBiometricsAtStart,
+        enableBiometrics: _config.isBiometricsEnabled,
+        title: widget.title,
+        errorMessage: widget.errorMessage,
+        biometricsTitle: widget.biometricsTitle,
+        decoration: widget.decoration,
+        top: widget.top,
+        bottom: widget.bottom,
+      ),
+    );
+  }
 
   Future<void> _setupBiometrics() async {
     if (widget.enableBiometrics) {
@@ -351,7 +388,11 @@ class _AppLockerState extends LifeCycleObserverState<AppLocker> {
                     }
                     return null;
                   },
-                  onUnlock: () => setState(() => _isAppLocked = false),
+                  onUnlock: () {
+                    _isAppLockerScreenActive = false;
+                    _isAppLocked = false;
+                    setState(() {});
+                  },
                   title: widget.title,
                   biometricsTitle: widget.biometricsTitle,
                   decoration: widget.decoration,

@@ -158,6 +158,7 @@ class _LockScreenState extends State<LockScreen>
               }
             },
             builder: (context, state) => Scaffold(
+              resizeToAvoidBottomInset: false,
               body: Stack(
                 children: <Widget>[
                   Container(
